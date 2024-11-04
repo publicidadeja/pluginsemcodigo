@@ -39,9 +39,6 @@ require_once GMA_PLUGIN_DIR . 'includes/admin-editar-material.php';
 require_once GMA_PLUGIN_DIR . 'includes/taxonomies.php';
 
 
-
-
-// Ativar plugin
 register_activation_hook(__FILE__, 'gma_ativar_plugin');
 
 function gma_ativar_plugin() {
@@ -59,14 +56,13 @@ function gma_ativar_plugin() {
     flush_rewrite_rules();
 }
 
-// Desativar plugin
 register_deactivation_hook(__FILE__, 'gma_desativar_plugin');
 
 function gma_desativar_plugin() {
     flush_rewrite_rules();
 }
 
-// Em gerenciador-marketing-avancado.php
+
 function gma_enqueue_admin_assets($hook) {
     $gma_pages = array(
         'toplevel_page_gma-plugin',
@@ -146,6 +142,8 @@ function gma_enqueue_frontend_assets() {
     ));
 }
 add_action('wp_enqueue_scripts', 'gma_enqueue_frontend_assets');
+
+
 
 // Usar template personalizado para exibição de campanha
 function gma_custom_template($template) {
@@ -520,3 +518,69 @@ function gma_default_campaign_type_callback() {
 
 
 // Fim do arquivo
+
+function gma_adicionar_pagina_licenca() {
+    add_submenu_page(
+        'gma-plugin',
+        'Ativação do Plugin',
+        'Ativação',
+        'manage_options',
+        'gma-ativacao',
+        'gma_exibir_pagina_ativacao'
+    );
+}
+add_action('admin_menu', 'gma_adicionar_pagina_licenca');
+
+function gma_verificar_licenca($codigo) {
+    global $wpdb;
+    $tabela_licencas = $wpdb->prefix . 'gma_licencas';
+    $site_atual = get_site_url();
+    
+    $licenca = $wpdb->get_row($wpdb->prepare(
+        "SELECT * FROM $tabela_licencas WHERE codigo_licenca = %s",
+        $codigo
+    ));
+
+    if (!$licenca) {
+        return false;
+    }
+
+    if ($licenca->site_url && $licenca->site_url !== $site_atual) {
+        return false;
+    }
+
+    if ($licenca->data_expiracao && strtotime($licenca->data_expiracao) < time()) {
+        return false;
+    }
+
+    return true;
+}
+
+function gma_ativar_licenca($codigo) {
+    global $wpdb;
+    $tabela_licencas = $wpdb->prefix . 'gma_licencas';
+    $site_atual = get_site_url();
+    
+    if (gma_verificar_licenca($codigo)) {
+        $wpdb->update(
+            $tabela_licencas,
+            array(
+                'site_url' => $site_atual,
+                'status' => 'ativo',
+                'data_ativacao' => current_time('mysql'),
+                'data_expiracao' => date('Y-m-d H:i:s', strtotime('+1 year'))
+            ),
+            array('codigo_licenca' => $codigo)
+        );
+        return true;
+    }
+    return false;
+}
+
+function gma_verificar_acesso() {
+    $licenca_ativa = get_option('gma_licenca_ativa');
+    if (!$licenca_ativa || !gma_verificar_licenca($licenca_ativa)) {
+        return false;
+    }
+    return true;
+}
