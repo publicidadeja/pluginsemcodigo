@@ -716,6 +716,69 @@ function gma_dias_restantes_licenca() {
     return $diferenca->invert ? 0 : $diferenca->days;
 }
 
+function gma_generate_license_key() {
+    $prefix = 'GMA';
+    $random = substr(str_shuffle('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 0, 12);
+    return $prefix . '-' . chunk_split($random, 4, '-');
+}
+
+function gma_validate_license($license_key) {
+    global $wpdb;
+    
+    $license = $wpdb->get_row($wpdb->prepare(
+        "SELECT * FROM {$wpdb->prefix}gma_licenses 
+        WHERE license_key = %s AND status = 'active'",
+        $license_key
+    ));
+    
+    if (!$license) {
+        return false;
+    }
+    
+    // Check if license has expired
+    if (strtotime($license->expiration_date) < time()) {
+        $wpdb->update(
+            $wpdb->prefix . 'gma_licenses',
+            array('status' => 'expired'),
+            array('id' => $license->id)
+        );
+        return false;
+    }
+    
+    return true;
+}
+
+add_action('woocommerce_order_status_completed', 'gma_create_license_on_order_complete');
+
+function gma_create_license_on_order_complete($order_id) {
+    $order = wc_get_order($order_id);
+    $user_id = $order->get_user_id();
+    
+    // Generate license key
+    $license_key = gma_generate_license_key();
+    
+    // Set expiration date (1 year from now)
+    $expiration_date = date('Y-m-d H:i:s', strtotime('+1 year'));
+    
+    // Store license in database
+    global $wpdb;
+    $wpdb->insert(
+        $wpdb->prefix . 'gma_licenses',
+        array(
+            'user_id' => $user_id,
+            'license_key' => $license_key,
+            'expiration_date' => $expiration_date,
+            'status' => 'active'
+        )
+    );
+    
+    // Send email to customer with license key
+    $to = $order->get_billing_email();
+    $subject = 'Sua licença do BrandAI - Gerenciador de Marketing Avançado PRO';
+    $message = "Sua chave de licença é: " . $license_key;
+    wp_mail($to, $subject, $message);
+}
+
 // Adicione isto no seu arquivo de funções principais
 add_action('admin_init', function() {
     // Verifica se há uma URL de redirecionamento salva após ativação bem-sucedida
