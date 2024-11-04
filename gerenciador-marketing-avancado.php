@@ -533,6 +533,8 @@ function gma_adicionar_pagina_licenca() {
 }
 add_action('admin_menu', 'gma_adicionar_pagina_licenca');
 
+
+
 function gma_verificar_licenca($codigo) {
     global $wpdb;
     $tabela_licencas = $wpdb->prefix . 'gma_licencas';
@@ -685,8 +687,6 @@ function gma_processar_ativacao_licenca() {
     exit;
 }
 
-// Adicione isto no arquivo principal do plugin
-add_action('admin_init', 'gma_verificar_licenca_global');
 
 function gma_verificar_licenca_global() {
     global $pagenow;
@@ -748,6 +748,8 @@ function gma_validate_license($license_key) {
     return true;
 }
 
+
+
 add_action('woocommerce_order_status_completed', 'gma_create_license_on_order_complete');
 
 function gma_create_license_on_order_complete($order_id) {
@@ -791,3 +793,5 @@ add_action('admin_init', function() {
         }
     }
 });
+
+
