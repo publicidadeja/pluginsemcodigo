@@ -78,6 +78,25 @@ function gma_criar_tabelas() {
     dbDelta($sql_downloads);
 }
 
+function gma_create_license_table() {
+    global $wpdb;
+    $charset_collate = $wpdb->get_charset_collate();
+    
+    $sql = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}gma_licenses (
+        id mediumint(9) NOT NULL AUTO_INCREMENT,
+        user_id bigint(20) NOT NULL,
+        license_key varchar(255) NOT NULL,
+        expiration_date datetime NOT NULL,
+        status varchar(20) NOT NULL,
+        PRIMARY KEY  (id)
+    ) $charset_collate;";
+    
+    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+    dbDelta($sql);
+}
+
+register_activation_hook(__FILE__, 'gma_create_license_table');
+
 function gma_atualizar_tabela_materiais() {
     global $wpdb;
     $tabela_materiais = $wpdb->prefix . 'gma_materiais';
