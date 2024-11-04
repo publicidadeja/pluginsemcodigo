@@ -93,6 +93,26 @@ function gma_atualizar_tabela_materiais() {
     }
 }
 
+function gma_criar_tabela_licencas() {
+    global $wpdb;
+    $charset_collate = $wpdb->get_charset_collate();
+    $tabela_licencas = $wpdb->prefix . 'gma_licencas';
+
+    $sql = "CREATE TABLE IF NOT EXISTS $tabela_licencas (
+        id mediumint(9) NOT NULL AUTO_INCREMENT,
+        codigo_licenca varchar(32) NOT NULL,
+        data_ativacao datetime DEFAULT NULL,
+        data_expiracao datetime DEFAULT NULL,
+        site_url varchar(255) DEFAULT NULL,
+        status varchar(20) DEFAULT 'inativo',
+        PRIMARY KEY  (id),
+        UNIQUE KEY codigo_licenca (codigo_licenca)
+    ) $charset_collate;";
+
+    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+    dbDelta($sql);
+}
+
 // Função para verificar e criar tabelas se necessário
 function gma_verificar_tabelas() {
     global $wpdb;
