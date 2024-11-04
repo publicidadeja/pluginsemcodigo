@@ -101,6 +101,7 @@ function gma_criar_tabela_licencas() {
     $sql = "CREATE TABLE IF NOT EXISTS $tabela_licencas (
         id mediumint(9) NOT NULL AUTO_INCREMENT,
         codigo_licenca varchar(32) NOT NULL,
+        tipo_licenca varchar(10) NOT NULL DEFAULT 'teste',
         data_ativacao datetime DEFAULT NULL,
         data_expiracao datetime DEFAULT NULL,
         site_url varchar(255) DEFAULT NULL,
