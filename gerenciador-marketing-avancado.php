@@ -41,10 +41,12 @@ require_once GMA_PLUGIN_DIR . 'includes/taxonomies.php';
 
 register_activation_hook(__FILE__, 'gma_ativar_plugin');
 
+
 function gma_ativar_plugin() {
     gma_criar_tabelas();
     gma_criar_tabela_estatisticas();
     create_logs_table();
+    gma_criar_tabela_licencas();
 
     global $wpdb;
     $tabela_campanhas = $wpdb->prefix . 'gma_campanhas';
@@ -584,3 +586,88 @@ function gma_verificar_acesso() {
     }
     return true;
 }
+
+add_action('admin_post_gma_ativar_licenca', 'gma_processar_ativacao_licenca');
+
+function gma_processar_ativacao_licenca() {
+    if (!current_user_can('manage_options')) {
+        wp_die(__('Você não tem permissão para realizar esta ação.'));
+    }
+
+    check_admin_referer('gma_ativar_licenca', 'gma_licenca_nonce');
+
+    $codigo_licenca = isset($_POST['codigo_licenca']) ? sanitize_text_field($_POST['codigo_licenca']) : '';
+
+    if (empty($codigo_licenca)) {
+        wp_redirect(add_query_arg(
+            array(
+                'message' => 'Por favor, insira um código de licença válido.',
+                'type' => 'error'
+            ),
+            admin_url('admin.php?page=gma-ativacao')
+        ));
+        exit;
+    }
+
+    if (gma_ativar_licenca($codigo_licenca)) {
+        update_option('gma_licenca_ativa', $codigo_licenca);
+        wp_redirect(add_query_arg(
+            array(
+                'message' => 'Licença ativada com sucesso!',
+                'type' => 'success'
+            ),
+            admin_url('admin.php?page=gma-ativacao')
+        ));
+    } else {
+        wp_redirect(add_query_arg(
+            array(
+                'message' => 'Código de licença inválido.',
+                'type' => 'error'
+            ),
+            admin_url('admin.php?page=gma-ativacao')
+        ));
+    }
+    exit;
+}
+
+// Adicione isto no arquivo principal do plugin
+add_action('admin_init', 'gma_verificar_licenca_global');
+
+function gma_verificar_licenca_global() {
+    global $pagenow;
+    $pagina_atual = isset($_GET['page']) ? $_GET['page'] : '';
+    
+    // Lista de páginas que não precisam de verificação
+    $paginas_excluidas = array(
+        'gma-ativacao'
+    );
+    
+    // Verifica se está em uma página do plugin e não é uma página excluída
+    if (strpos($pagina_atual, 'gma-') === 0 && !in_array($pagina_atual, $paginas_excluidas)) {
+        gma_verificar_acesso_admin();
+    }
+}
+
+function gma_dias_restantes_licenca() {
+    $data_expiracao = get_option('gma_data_expiracao_licenca');
+    if (!$data_expiracao) return false;
+
+    $hoje = new DateTime();
+    $expiracao = new DateTime($data_expiracao);
+    $diferenca = $hoje->diff($expiracao);
+
+    return $diferenca->invert ? 0 : $diferenca->days;
+}
+
+// Adicione isto no seu arquivo de funções principais
+add_action('admin_init', function() {
+    // Verifica se há uma URL de redirecionamento salva após ativação bem-sucedida
+    if (isset($_GET['activation_success']) && $_GET['activation_success'] == 1) {
+        $redirect_url = get_option('gma_redirect_after_activation');
+        if ($redirect_url) {
+            delete_option('gma_redirect_after_activation');
+            wp_redirect($redirect_url);
+            exit;
+        }
+    }
+});
