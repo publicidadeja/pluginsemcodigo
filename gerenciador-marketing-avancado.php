@@ -539,6 +539,75 @@ function gma_verificar_licenca($codigo) {
     $site_atual = get_site_url();
     
     $licenca = $wpdb->get_row($wpdb->prepare(
+        "SELECT * FROM $tabela_licencas WHERE codigo_licenca = %s AND status = 'ativo'",
+        $codigo
+    ));
+
+    if (!$licenca) {
+        return false;
+    }
+
+    // Verifica se está no site correto
+    if ($licenca->site_url !== $site_atual) {
+        return false;
+    }
+
+    // Verifica se não expirou
+    if (strtotime($licenca->data_expiracao) < time()) {
+        $wpdb->update(
+            $tabela_licencas,
+            array('status' => 'expirado'),
+            array('codigo_licenca' => $codigo)
+        );
+        return false;
+    }
+
+    return true;
+}
+
+function gma_criar_licenca_teste() {
+    global $wpdb;
+    $tabela_licencas = $wpdb->prefix . 'gma_licencas';
+    
+    $codigo = 'TESTE-' . strtoupper(substr(md5(uniqid()), 0, 8));
+    
+    $wpdb->insert(
+        $tabela_licencas,
+        array(
+            'codigo_licenca' => $codigo,
+            'tipo_licenca' => 'teste',
+            'status' => 'inativo'
+        )
+    );
+    
+    return $codigo;
+}
+
+function gma_criar_licenca_pro() {
+    global $wpdb;
+    $tabela_licencas = $wpdb->prefix . 'gma_licencas';
+    
+    $codigo = 'PRO-' . strtoupper(substr(md5(uniqid()), 0, 12));
+    
+    $wpdb->insert(
+        $tabela_licencas,
+        array(
+            'codigo_licenca' => $codigo,
+            'tipo_licenca' => 'pro',
+            'status' => 'inativo'
+        )
+    );
+    
+    return $codigo;
+}
+
+function gma_ativar_licenca($codigo) {
+    global $wpdb;
+    $tabela_licencas = $wpdb->prefix . 'gma_licencas';
+    $site_atual = get_site_url();
+    
+    // Verifica se a licença existe
+    $licenca = $wpdb->get_row($wpdb->prepare(
         "SELECT * FROM $tabela_licencas WHERE codigo_licenca = %s",
         $codigo
     ));
@@ -547,36 +616,22 @@ function gma_verificar_licenca($codigo) {
         return false;
     }
 
-    if ($licenca->site_url && $licenca->site_url !== $site_atual) {
-        return false;
-    }
-
-    if ($licenca->data_expiracao && strtotime($licenca->data_expiracao) < time()) {
-        return false;
-    }
+    // Define a duração baseada no tipo de licença
+    $duracao = ($licenca->tipo_licenca === 'pro') ? '+1 year' : '+1 day';
+    
+    // Atualiza a licença
+    $wpdb->update(
+        $tabela_licencas,
+        array(
+            'site_url' => $site_atual,
+            'status' => 'ativo',
+            'data_ativacao' => current_time('mysql'),
+            'data_expiracao' => date('Y-m-d H:i:s', strtotime($duracao))
+        ),
+        array('codigo_licenca' => $codigo)
+    );
 
     return true;
-}
-
-function gma_ativar_licenca($codigo) {
-    global $wpdb;
-    $tabela_licencas = $wpdb->prefix . 'gma_licencas';
-    $site_atual = get_site_url();
-    
-    if (gma_verificar_licenca($codigo)) {
-        $wpdb->update(
-            $tabela_licencas,
-            array(
-                'site_url' => $site_atual,
-                'status' => 'ativo',
-                'data_ativacao' => current_time('mysql'),
-                'data_expiracao' => date('Y-m-d H:i:s', strtotime('+1 year'))
-            ),
-            array('codigo_licenca' => $codigo)
-        );
-        return true;
-    }
-    return false;
 }
 
 function gma_verificar_acesso() {
@@ -647,6 +702,8 @@ function gma_verificar_licenca_global() {
         gma_verificar_acesso_admin();
     }
 }
+
+
 
 function gma_dias_restantes_licenca() {
     $data_expiracao = get_option('gma_data_expiracao_licenca');
