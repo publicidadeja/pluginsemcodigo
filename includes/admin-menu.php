@@ -5,7 +5,69 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+function gma_verificar_acesso_admin() {
+    // Verifica se o usuário tem permissões de administrador
+    if (!current_user_can('manage_options')) {
+        wp_die(__('Você não tem permissão para acessar esta página.'));
+    }
+
+    // Verifica se a licença está ativa
+    if (!gma_verificar_acesso()) {
+        // Adiciona mensagem de erro
+        add_settings_error(
+            'gma_messages',
+            'gma_licenca_invalida',
+            'Sua licença está inválida ou expirada. Por favor, ative o plugin para continuar.',
+            'error'
+        );
+
+        // Salva a mensagem de erro para exibição
+        set_transient('settings_errors', get_settings_errors(), 30);
+
+        // Salva a URL atual para retornar depois da ativação
+        if (isset($_SERVER['REQUEST_URI'])) {
+            update_option('gma_redirect_after_activation', $_SERVER['REQUEST_URI']);
+        }
+
+        // Registra o erro no log do WordPress
+        error_log('Tentativa de acesso com licença inválida: ' . $_SERVER['REQUEST_URI']);
+
+        // Redireciona para a página de ativação
+        wp_redirect(add_query_arg(
+            array(
+                'page' => 'gma-ativacao',
+                'error' => 'licenca_invalida'
+            ),
+            admin_url('admin.php')
+        ));
+        exit;
+    }
+
+    // Verifica se a licença está próxima de expirar (opcional)
+    $dias_restantes = gma_dias_restantes_licenca(); // Você precisa implementar esta função
+    if ($dias_restantes && $dias_restantes <= 7) {
+        add_action('admin_notices', function() use ($dias_restantes) {
+            ?>
+            <div class="notice notice-warning is-dismissible">
+                <p>
+                    <strong>Atenção:</strong> 
+                    Sua licença expirará em <?php echo $dias_restantes; ?> dias. 
+                    <a href="<?php echo admin_url('admin.php?page=gma-ativacao'); ?>">Renovar agora</a>
+                </p>
+            </div>
+            <?php
+        });
+    }
+}
+
 add_action('admin_menu', 'gma_criar_menu_admin');
+function gma_exibir_pagina_ativacao() {
+    if (!current_user_can('manage_options')) {
+        wp_die(__('Você não tem permissão para acessar esta página.'));
+    }
+    
+    include GMA_PLUGIN_DIR . 'templates/pagina-ativacao.php';
+}
 
 function gma_criar_menu_admin() {
     // Adicionando a página principal do plugin
@@ -44,6 +106,8 @@ function gma_criar_menu_admin() {
 
 // Funções para exibir as páginas
 function gma_pagina_principal() {
+  gma_verificar_acesso_admin(); // Adicione esta linha
+    $notificacao = get_transient('gma_notificacao_admin');
   // Verificar se existe uma notificação
     $notificacao = get_transient('gma_notificacao_admin');
 
@@ -58,6 +122,7 @@ function gma_pagina_principal() {
 }
 
 function gma_pagina_campanhas() {
+  gma_verificar_acesso_admin();
     global $wpdb;
     if (isset($_POST['criar_campanha'])) {
         $nome = sanitize_text_field($_POST['nome_campanha']);
@@ -77,6 +142,7 @@ function gma_pagina_campanhas() {
 }
 
 function gma_pagina_nova_campanha() {
+  gma_verificar_acesso_admin();
     // Implementar lógica para criar nova campanha
     include GMA_PLUGIN_DIR . 'templates/pagina-nova-campanha.php';
 }
@@ -97,6 +163,7 @@ function gma_pagina_editar_campanha() {
 }
 
 function gma_pagina_listar_materiais() {
+  gma_verificar_acesso_admin();
   // Verificar se existe uma notificação
     $notificacao = get_transient('gma_notificacao_admin');
 
@@ -124,6 +191,7 @@ function gma_pagina_listar_materiais() {
 }
 
 function gma_pagina_novo_material() {
+  gma_verificar_acesso_admin();
     if (!session_id()) {
         session_start();
     }
@@ -164,6 +232,7 @@ function gma_pagina_novo_material() {
 }
 
 function gma_pagina_editar_material() {
+  gma_verificar_acesso_admin();
     if (!isset($_GET['id']) || !isset($_GET['tipo'])) {
         wp_die('Parâmetros inválidos.');
     }
@@ -223,6 +292,7 @@ function gma_pagina_editar_material() {
 }
 
 function gma_pagina_listar_categorias() {
+  gma_verificar_acesso_admin();
     if (!current_user_can('manage_options')) {
         wp_die(__('Você não tem permissão para acessar esta página.'));
     }
@@ -254,14 +324,17 @@ function gma_pagina_listar_categorias() {
 }
 
 function gma_pagina_criar_categoria() {
+  gma_verificar_acesso_admin();
     include GMA_PLUGIN_DIR . 'templates/pagina-criar-categoria.php';
 }
 
 function gma_pagina_relatorio_campanhas() {
+  gma_verificar_acesso_admin();
     include GMA_PLUGIN_DIR . 'templates/pagina-relatorio-campanhas.php';
 }
 
 function gma_atualizar_categoria($id, $novo_nome) {
+  gma_verificar_acesso_admin();
     global $wpdb;
     $table_name = $wpdb->prefix . 'gma_categorias';
     
@@ -282,6 +355,7 @@ function gma_atualizar_categoria($id, $novo_nome) {
 }
 
 function gma_excluir_categoria($id) {
+  gma_verificar_acesso_admin();
     global $wpdb;
     $table_name = $wpdb->prefix . 'gma_categorias';
     
