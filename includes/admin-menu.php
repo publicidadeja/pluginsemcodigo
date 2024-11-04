@@ -6,33 +6,12 @@ if (!defined('ABSPATH')) {
 }
 
 function gma_verificar_acesso_admin() {
-    // Verifica se o usuário tem permissões de administrador
     if (!current_user_can('manage_options')) {
         wp_die(__('Você não tem permissão para acessar esta página.'));
     }
 
-    // Verifica se a licença está ativa
-    if (!gma_verificar_acesso()) {
-        // Adiciona mensagem de erro
-        add_settings_error(
-            'gma_messages',
-            'gma_licenca_invalida',
-            'Sua licença está inválida ou expirada. Por favor, ative o plugin para continuar.',
-            'error'
-        );
-
-        // Salva a mensagem de erro para exibição
-        set_transient('settings_errors', get_settings_errors(), 30);
-
-        // Salva a URL atual para retornar depois da ativação
-        if (isset($_SERVER['REQUEST_URI'])) {
-            update_option('gma_redirect_after_activation', $_SERVER['REQUEST_URI']);
-        }
-
-        // Registra o erro no log do WordPress
-        error_log('Tentativa de acesso com licença inválida: ' . $_SERVER['REQUEST_URI']);
-
-        // Redireciona para a página de ativação
+    $licenca_ativa = get_option('gma_licenca_ativa');
+    if (!$licenca_ativa || !gma_verificar_licenca($licenca_ativa)) {
         wp_redirect(add_query_arg(
             array(
                 'page' => 'gma-ativacao',
@@ -41,22 +20,6 @@ function gma_verificar_acesso_admin() {
             admin_url('admin.php')
         ));
         exit;
-    }
-
-    // Verifica se a licença está próxima de expirar (opcional)
-    $dias_restantes = gma_dias_restantes_licenca(); // Você precisa implementar esta função
-    if ($dias_restantes && $dias_restantes <= 7) {
-        add_action('admin_notices', function() use ($dias_restantes) {
-            ?>
-            <div class="notice notice-warning is-dismissible">
-                <p>
-                    <strong>Atenção:</strong> 
-                    Sua licença expirará em <?php echo $dias_restantes; ?> dias. 
-                    <a href="<?php echo admin_url('admin.php?page=gma-ativacao'); ?>">Renovar agora</a>
-                </p>
-            </div>
-            <?php
-        });
     }
 }
 
