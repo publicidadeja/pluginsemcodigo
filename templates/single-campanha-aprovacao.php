@@ -1,5 +1,5 @@
 <?php
-// Enfileira os scripts e estilos necessários
+// Mantenha os enqueues existentes
 wp_enqueue_script('jquery');
 wp_enqueue_script('swiper', 'https://unpkg.com/swiper/swiper-bundle.min.js', array(), null, true);
 wp_enqueue_script('gsap', 'https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js', array(), null, true);
@@ -8,18 +8,10 @@ wp_enqueue_script('gma-script', plugin_dir_url(__FILE__) . '../assets/js/gma-scr
 
 wp_enqueue_style('roboto-font', 'https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
 wp_enqueue_style('swiper-css', 'https://unpkg.com/swiper/swiper-bundle.min.css');
-wp_enqueue_style('sweetalert2-css', 'https://cdn.jsdelivr.net/npm/@sweetalert2/theme-material-ui/material-ui.css');
-
-// Passa dados para o JavaScript
-wp_localize_script('gma-script', 'gmaAjax', array(
-    'ajaxurl' => admin_url('admin-ajax.php'),
-    'nonce' => wp_create_nonce('gma_ajax_nonce')
-));
 
 get_header();
 
 $campanha_id = get_query_var('campanha_id'); 
-gma_atualizar_visualizacao_campanha($campanha_id); 
 $campanha = gma_obter_campanha($campanha_id);
 $materiais = gma_listar_materiais($campanha_id);
 
@@ -27,281 +19,222 @@ if ($campanha) :
 ?>
 
 <style>
-    :root {
-        --primary-color: #3498db;
-        --secondary-color: #2ecc71;
-        --danger-color: #e74c3c;
-        --warning-color: #f39c12;
-        --text-color: #34495e;
-        --background-color: #ecf0f1;
-    }
-
-    body {
-        font-family: 'Roboto', sans-serif;
-        background-color: var(--background-color);
-        color: var(--text-color);
-    }
-
     .gma-container {
-        max-width: 900px; /* Ajuste a largura máxima conforme necessário */
+        width: 100%;
+        max-width: 1200px;
         margin: 0 auto;
-        padding: 20px;
+        padding: 15px;
+        box-sizing: border-box;
     }
 
     .gma-title {
-        font-size: 2rem; /* Aumente o tamanho da fonte do título */
-        font-weight: 700;
-        color: var(--primary-color);
+        font-size: clamp(1.5rem, 4vw, 2.5rem);
         text-align: center;
-        margin-bottom: 30px;
-        text-transform: uppercase;
+        margin: 20px 0;
+        color: #333;
     }
 
     .swiper-container {
         width: 100%;
-        padding-top: 50px;
-        padding-bottom: 50px;
+        padding: 20px 0;
+        overflow: hidden;
+        position: relative;
     }
 
     .swiper-slide {
-        background-position: center;
-        background-size: cover;
         width: 100%;
-        height: auto;
-        min-height: 300px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
     }
 
     .gma-material {
-        background-color: #fff;
-        border-radius: 10px;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-        height: 100%;
-        display: flex;
-        flex-direction: column;
+        width: 100%;
+        max-width: 500px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        margin: 10px;
+        position: relative; /* Para posicionar o status */
     }
 
     .gma-material-image-container {
+        width: 100%;
         position: relative;
-        height: 250px; /* Ajuste a altura da imagem conforme necessário */
-        overflow: hidden;
-        border-top-left-radius: 10px;
-        border-top-right-radius: 10px;
+        padding-top: 56.25%; /* Aspect ratio 16:9 */
     }
 
     .gma-material-image {
+        position: absolute;
+        top: 0;
+        left: 0;
         width: 100%;
         height: 100%;
         object-fit: cover;
-    }
-
-    .gma-material-zoom {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background-color: rgba(255, 255, 255, 0.7);
-        border-radius: 50%;
-        padding: 10px;
-        cursor: pointer;
-        transition: background-color 0.3s ease;
-    }
-
-    .gma-material-zoom:hover {
-        background-color: rgba(255, 255, 255, 0.9);
+        border-radius: 12px 12px 0 0;
     }
 
     .gma-material-content {
         padding: 20px;
-        flex-grow: 1;
-        display: flex;
-        flex-direction: column;
     }
 
     .gma-copy {
-        font-size: 1rem; /* Ajuste o tamanho da fonte do copy */
+        font-size: 16px;
         line-height: 1.5;
         margin-bottom: 15px;
-        flex-grow: 1;
     }
 
     .gma-status {
-        font-weight: 500;
-        text-transform: uppercase;
-        margin-bottom: 15px;
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(255, 255, 255, 0.8);
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-size: 12px;
+        font-weight: bold;
+        color: #333;
     }
 
-    .gma-material.status-aprovado .gma-status { color: var(--secondary-color); }
-    .gma-material.status-reprovado .gma-status { color: var(--danger-color); }
-    .gma-material.status-pendente .gma-status { color: var(--warning-color); }
+    .gma-status.status-aprovado {
+        background: #2ecc71;
+        color: #fff;
+    }
+
+    .gma-status.status-reprovado {
+        background: #e74c3c;
+        color: #fff;
+    }
+
+    .gma-status.status-pendente {
+        background: #f39c12;
+        color: #fff;
+    }
 
     .gma-acoes {
-        display: flex;
-        justify-content: space-between;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
         gap: 10px;
-        margin-top: 20px;
+        margin-top: 15px;
     }
 
     .gma-acoes button {
-        padding: 10px 15px; /* Aumente o padding dos botões */
+        padding: 12px;
         border: none;
-        border-radius: 5px;
+        border-radius: 8px;
         font-weight: 500;
         cursor: pointer;
-        transition: background-color 0.3s ease, transform 0.1s ease;
-        flex: 1;
+        transition: all 0.3s ease;
     }
 
-    .gma-aprovar { background-color: var(--secondary-color); color: white; }
-    .gma-reprovar { background-color: var(--danger-color); color: white; }
-    .gma-editar { background-color: var(--primary-color); color: white; }
-
-    .lightbox {
-        display: none;
-        position: fixed;
-        z-index: 1000;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        overflow: hidden; /* Impede scroll na imagem */
-        background-color: rgba(0,0,0,0.9);
-    }
-
-    .lightbox-content {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        max-width: 90%;
-        max-height: 90%;
-        background-color: #fff;
-        padding: 20px;
-        border-radius: 5px;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-    }
-
-    .close-lightbox {
-        position: absolute;
-        top: 15px;
-        right: 35px;
-        color: #f1f1f1;
-        font-size: 40px;
-        font-weight: bold;
-        transition: 0.3s;
-        cursor: pointer;
-    }
-
-    .close-lightbox:hover,
-    .close-lightbox:focus {
-        color: #bbb;
-        text-decoration: none;
-        cursor: pointer;
-    }
+    .gma-aprovar { background-color: #2ecc71; color: white; }
+    .gma-reprovar { background-color: #e74c3c; color: white; }
+    .gma-editar { background-color: #3498db; color: white; }
 
     .gma-edicao {
-        background-color: #f8f9fa;
-        padding: 20px;
-        border-radius: 5px;
-        margin-top: 15px;
         display: none;
-    }
-
-    .gma-edicao h3 {
-        margin-bottom: 10px;
-    }
-
-    .gma-edicao label {
-        display: block;
-        margin-bottom: 5px;
-        font-weight: 500;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        margin-top: 15px;
     }
 
     .gma-edicao textarea {
         width: 100%;
         padding: 10px;
-        border: 1px solid #ced4da;
-        border-radius: 5px;
-        resize: vertical;
-        margin-bottom: 15px;
+        margin-bottom: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
     }
 
-    .gma-edicao button {
-        padding: 10px 15px;
-        border: none;
-        border-radius: 5px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: background-color 0.3s ease;
-        margin-right: 10px;
-    }
-
-    .gma-edicao .gma-salvar-edicao {
-        background-color: var(--secondary-color);
-        color: white;
-    }
-
-    .gma-edicao .gma-cancelar-edicao {
-        background-color: var(--danger-color);
-        color: white;
-    }
-
+    /* Estilos específicos para mobile */
     @media (max-width: 768px) {
         .swiper-container {
-            slidesPerView: 1; 
+            padding: 10px 0;
         }
 
-        .gma-container {
-            max-width: 100%;
+        .gma-material {
+            margin: 5px;
         }
 
-        .gma-material-card {
-            width: 100%;
+        .swiper-slide {
+            width: 100% !important; /* Força largura total no mobile */
         }
 
-        .gma-acoes {
-            flex-direction: column;
-        }
-
-        .gma-aprovar, .gma-reprovar, .gma-editar {
-            width: 100%;
-        }
-    }
-
-    @media (max-width: 480px) {
-        .gma-campanha-content {
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .gma-campanha-sidebar {
-            margin-right: 0;
-            margin-bottom: 2rem;
-        }
-
-        .gma-campanha-hero {
-            height: 40vh;
-        }
-
-        .gma-campanha-title {
-            font-size: 1.8rem;
-        }
-
-        .gma-campanha-dates {
-            flex-direction: column;
-            gap: 0.5rem;
+        .gma-material-content {
+            padding: 15px;
         }
 
         .gma-copy {
-            font-size: 0.8rem;
+            font-size: 14px;
         }
 
-        .gma-material-image-container {
-            height: 250px;
+        .gma-acoes {
+            grid-template-columns: 1fr; /* Botões empilhados no mobile */
         }
 
-        .gma-material-zoom {
-            top: 5px;
-            right: 5px;
+        .gma-acoes button {
+            width: 100%;
+            margin-bottom: 5px;
         }
+
+        .gma-status {
+            top: 15px;
+            right: 15px;
+        }
+    }
+
+    /* Ajustes do Lightbox */
+    .lightbox {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.9);
+    }
+
+    .lightbox-content {
+        max-width: 90%;
+        max-height: 90vh;
+        margin: auto;
+        display: block;
+        position: relative;
+        top: 50%;
+        transform: translateY(-50%);
+    }
+
+    .close-lightbox {
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        color: #fff;
+        font-size: 30px;
+        cursor: pointer;
+    }
+
+    /* Estilos para as setas do Swiper */
+    .swiper-button-next,
+    .swiper-button-prev {
+        top: 50%; /* Posiciona as setas no meio da altura */
+        transform: translateY(-50%); /* Centraliza verticalmente */
+        z-index: 10; /* Garante que as setas fiquem acima dos botões */
+        background-color: rgba(0, 0, 0, 0.5); /* Define a cor de fundo das setas */
+        color: white; /* Define a cor do texto das setas */
+        padding: 10px; /* Define o espaçamento interno das setas */
+        border-radius: 50%; /* Define o formato arredondado das setas */
+        cursor: pointer; /* Define o cursor do mouse como ponteiro */
+    }
+
+    /* Posiciona as setas fora do conteúdo */
+    .swiper-button-next {
+        right: 20px; /* Ajusta a distância da borda direita */
+    }
+
+    .swiper-button-prev {
+        left: 20px; /* Ajusta a distância da borda esquerda */
     }
 </style>
 
@@ -313,29 +246,32 @@ if ($campanha) :
             <div class="swiper-wrapper">
                 <?php foreach ($materiais as $material) : ?>
                     <div class="swiper-slide">
-                        <div class="gma-material status-<?php echo esc_attr($material->status_aprovacao ?? 'pendente'); ?>" data-material-id="<?php echo esc_attr($material->id); ?>">
+                        <div class="gma-material" data-material-id="<?php echo esc_attr($material->id); ?>">
                             <div class="gma-material-image-container">
-                                <img class="gma-material-image lightbox-trigger" src="<?php echo esc_url($material->imagem_url); ?>" alt="Material">
-                                <span class="gma-material-zoom" title="Ampliar imagem">🔍</span>
+                                <img class="gma-material-image lightbox-trigger" 
+                                     src="<?php echo esc_url($material->imagem_url); ?>" 
+                                     alt="Material">
                             </div>
                             <div class="gma-material-content">
                                 <p class="gma-copy"><?php echo wp_kses_post($material->copy ?? ''); ?></p>
-                                <p class="gma-status">Status: <?php echo esc_html(ucfirst($material->status_aprovacao ?? 'Pendente')); ?></p>
                                 <div class="gma-acoes">
-                                    <button class="gma-aprovar" <?php echo $material->status_aprovacao === 'aprovado' ? 'disabled' : ''; ?>>Aprovar</button>
-                                    <button class="gma-reprovar" <?php echo $material->status_aprovacao === 'reprovado' ? 'disabled' : ''; ?>>Reprovar</button>
-                                    <button class="gma-editar" data-material-id="<?php echo esc_attr($material->id); ?>">Editar</button>
+                                    <button class="gma-aprovar" data-action="aprovar" <?php echo $material->status_aprovacao === 'aprovado' ? 'disabled' : ''; ?>>Aprovar</button>
+                                    <button class="gma-reprovar" data-action="reprovar" <?php echo $material->status_aprovacao === 'reprovado' ? 'disabled' : ''; ?>>Reprovar</button>
+                                    <button class="gma-editar" data-action="editar">Editar</button>
                                 </div>
-                                <div class="gma-edicao" style="display: none;">
+                                <div class="gma-edicao">
                                     <h3>Editar Material</h3>
-                                    <label for="alteracao-arte-<?php echo esc_attr($material->id); ?>">Qual alteração na arte?</label>
-                                    <textarea id="alteracao-arte-<?php echo esc_attr($material->id); ?>" class="gma-alteracao-arte" rows="4"><?php echo esc_textarea($material->feedback ?? ''); ?></textarea>
-                                    <label for="copy-edit-<?php echo esc_attr($material->id); ?>">Editar Copy:</label>
-                                    <textarea id="copy-edit-<?php echo esc_attr($material->id); ?>" class="gma-copy-edit" rows="4"><?php echo esc_textarea($material->copy ?? ''); ?></textarea>
-                                    <button class="gma-salvar-edicao" data-material-id="<?php echo esc_attr($material->id); ?>">Salvar Edição</button>
+                                    <textarea class="gma-alteracao-arte" rows="4" 
+                                              placeholder="Descreva as alterações necessárias"></textarea>
+                                    <textarea class="gma-copy-edit" rows="4" 
+                                              placeholder="Editar copy"><?php echo esc_textarea($material->copy ?? ''); ?></textarea>
+                                    <button class="gma-salvar-edicao" data-material-id="<?php echo esc_attr($material->id); ?>">Salvar</button>
                                     <button class="gma-cancelar-edicao">Cancelar</button>
                                 </div>
                             </div>
+                            <p class="gma-status status-<?php echo esc_attr($material->status_aprovacao ?? 'pendente'); ?>">
+                                <?php echo esc_html(ucfirst($material->status_aprovacao ?? 'Pendente')); ?>
+                            </p>
                         </div>
                     </div>
                 <?php endforeach; ?>
@@ -344,74 +280,49 @@ if ($campanha) :
             <div class="swiper-button-next"></div>
             <div class="swiper-button-prev"></div>
         </div>
-    <?php else : ?>
-        <p>Nenhum material encontrado para esta campanha.</p>
     <?php endif; ?>
 </div>
 
 <div id="imageLightbox" class="lightbox">
     <span class="close-lightbox">×</span>
-    <img class="lightbox-content" id="lightboxImage">
+    <img class="lightbox-content" id="lightboxImage" src="" alt="Lightbox Image">
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var swiper = new Swiper('.swiper-container', {
+        slidesPerView: 1,
+        spaceBetween: 30,
+        centeredSlides: true,
+        loop: false,
+        pagination: {
+            el: '.swiper-pagination',
+            clickable: true,
+        },
+        navigation: {
+            nextEl: '.swiper-button-next',
+            prevEl: '.swiper-button-prev',
+        },
+        breakpoints: {
+            // quando a largura da tela for >= 768px
+            768: {
+                slidesPerView: 'auto',
+                spaceBetween: 30
+            }
+        },
+        on: {
+            slideChange: function () {
+                // Fecha o campo de edição ao mudar de slide
+                $('.gma-edicao').hide();
+            }
+        },
+        speed: 500, /* Define a velocidade de transição para 500ms */
+        allowTouchMove: true, // Habilita o swipe do usuário
+    });
+});
+</script>
 
 <?php
 endif;
-
-add_action('wp_footer', 'gma_initialize_swiper', 100);
-function gma_initialize_swiper() {
-    ?>
-    <script>
-    jQuery(document).ready(function($) {
-        var swiper = new Swiper('.swiper-container', {
-            effect: 'coverflow',
-            grabCursor: true,
-            centeredSlides: true,
-            slidesPerView: 'auto',
-            coverflowEffect: {
-                rotate: 50,
-                stretch: 0,
-                depth: 100,
-                modifier: 1,
-                slideShadows: true,
-            },
-            pagination: {
-                el: '.swiper-pagination',
-                clickable: true,
-            },
-            navigation: {
-                nextEl: '.swiper-button-next',
-                prevEl: '.swiper-button-prev',
-            },
-        });
-
-        // Lightbox
-        $('.lightbox-trigger').click(function() {
-            $('#lightboxImage').attr('src', $(this).attr('src'));
-            $('#imageLightbox').show();
-        });
-
-        $('.close-lightbox').click(function() {
-            $('#imageLightbox').hide();
-        });
-
-        // Edição de Material
-        $('.gma-editar').click(function() {
-            var materialId = $(this).data('material-id');
-            $('.gma-edicao[data-material-id="' + materialId + '"]').show();
-        });
-
-        $('.gma-cancelar-edicao').click(function() {
-            $(this).closest('.gma-edicao').hide();
-        });
-
-        // Swiper Slide Change
-        swiper.on('slideChange', function() {
-            $('.gma-edicao').hide(); // Fecha a caixa de edição ao mudar de slide
-        });
-    });
-    </script>
-    <?php
-}
-
 get_footer();
 ?>
