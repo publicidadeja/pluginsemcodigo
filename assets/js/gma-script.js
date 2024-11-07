@@ -11,83 +11,100 @@
         }
 
         var swiper = new Swiper('.swiper-container', {
-            effect: 'coverflow',
-            grabCursor: true,
-            centeredSlides: true,
+    slidesPerView: 1,
+    spaceBetween: 30,
+    centeredSlides: true,
+    loop: false,
+    grabCursor: true,
+    speed: 500,
+    allowTouchMove: true,
+    pagination: {
+        el: '.swiper-pagination',
+        clickable: true,
+    },
+    navigation: {
+        nextEl: '.swiper-button-next',
+        prevEl: '.swiper-button-prev',
+    },
+    breakpoints: {
+        768: {
             slidesPerView: 'auto',
-            coverflowEffect: {
-                rotate: 50,
-                stretch: 0,
-                depth: 100,
-                modifier: 1,
-                slideShadows: true,
-            },
-            pagination: {
-                el: '.swiper-pagination',
-                clickable: true,
-            },
-            navigation: {
-                nextEl: '.swiper-button-next',
-                prevEl: '.swiper-button-prev',
-            },
-        });
+            spaceBetween: 30
+        }
+    }
+});
 
         // Função para lidar com cliques/toques nos botões
-        function handleButtonClick(event) {
-            var $button = $(this);
-            var $material = $button.closest('.gma-material');
-            var materialId = $material.data('material-id');
-            var acao = $button.hasClass('gma-aprovar') ? 'aprovar' : 'reprovar';
-            
-            $.ajax({
-                url: gmaAjax.ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'gma_' + acao + '_material',
-                    material_id: materialId,
-                    nonce: gmaAjax.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Sucesso!',
-                            text: 'Material ' + (acao === 'aprovar' ? 'aprovado' : 'reprovado') + ' com sucesso!',
-                            showConfirmButton: false,
-                            timer: 1500
-                        });
+      function handleButtonClick(event) {
+    var $button = $(this);
+    
+    // Evita múltiplos cliques
+    if ($button.data('processing')) {
+        return false;
+    }
+    
+    $button.data('processing', true);
+    var $material = $button.closest('.gma-material');
+    var materialId = $material.data('material-id');
+    var acao = $button.hasClass('gma-aprovar') ? 'aprovar' : 'reprovar';
+    
+    // Desabilita visualmente o botão
+    $button.prop('disabled', true);
+    
+    $.ajax({
+        url: gmaAjax.ajaxurl,
+        type: 'POST',
+        data: {
+            action: 'gma_' + acao + '_material',
+            material_id: materialId,
+            nonce: gmaAjax.nonce
+        },
+        success: function(response) {
+            if (response.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso!',
+                    text: 'Material ' + (acao === 'aprovar' ? 'aprovado' : 'reprovado') + ' com sucesso!',
+                    showConfirmButton: false,
+                    timer: 1500
+                });
 
-                        $material.removeClass('status-aprovado status-reprovado status-pendente').addClass('status-' + acao);
-                        $material.find('.gma-status').text('Status: ' + acao.charAt(0).toUpperCase() + acao.slice(1));
-                        $button.prop('disabled', true).siblings().prop('disabled', false);
-                        
-                        gsap.to($material, {
-                            duration: 0.3,
-                            scale: 1.05,
-                            yoyo: true,
-                            repeat: 1,
-                            ease: "power2.inOut",
-                            onComplete: function() {
-                                swiper.slideNext();
-                            }
-                        });
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Oops...',
-                            text: 'Erro: ' + response.data.message
-                        });
+                $material.removeClass('status-aprovado status-reprovado status-pendente').addClass('status-' + acao);
+                $material.find('.gma-status').text('Status: ' + acao.charAt(0).toUpperCase() + acao.slice(1));
+                $button.siblings().prop('disabled', false);
+                
+                gsap.to($material, {
+                    duration: 0.3,
+                    scale: 1.05,
+                    yoyo: true,
+                    repeat: 1,
+                    ease: "power2.inOut",
+                    onComplete: function() {
+                        swiper.slideNext();
                     }
-                },
-                error: function() {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Oops...',
-                        text: 'Erro ao processar a solicitação. Por favor, tente novamente.'
-                    });
-                }
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Oops...',
+                    text: 'Erro: ' + response.data.message
+                });
+            }
+        },
+        error: function() {
+            Swal.fire({
+                icon: 'error',
+                title: 'Oops...',
+                text: 'Erro ao processar a solicitação. Por favor, tente novamente.'
             });
+        },
+        complete: function() {
+            // Remove a trava e reabilita o botão
+            $button.data('processing', false);
+            $button.prop('disabled', false);
         }
+    });
+}
 
         // Atribuir a função aos eventos 'click' e 'touchstart' usando delegação
         $(document).on('click touchstart', '.gma-aprovar, .gma-reprovar', handleButtonClick);
@@ -190,3 +207,21 @@
         });
     });
 })(jQuery);
+
+$('#gma-material-form').on('submit', function(e) {
+    e.preventDefault();
+    
+    // Desabilita o botão para evitar múltiplos envios
+    var $submitButton = $(this).find('button[type="submit"]');
+    if ($submitButton.prop('disabled')) {
+        return false;
+    }
+    $submitButton.prop('disabled', true);
+    
+    // Seu código AJAX aqui
+    
+    // Reabilita o botão após a resposta
+    .always(function() {
+        $submitButton.prop('disabled', false);
+    });
+});
