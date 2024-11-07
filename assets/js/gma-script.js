@@ -56,20 +56,22 @@
         // Função para lidar com cliques nos botões
         function handleButtonClick(event) {
             event.preventDefault();
+            event.stopPropagation(); // Previne propagação do evento
             
             // Verifica se já está processando
-            if (isProcessing) return;
+            if (isProcessing) {
+                return false; // Retorna false explicitamente
+            }
             
             // Marca como processando
             isProcessing = true;
             
             const $button = $(this);
+            $button.prop('disabled', true); // Desabilita o botão imediatamente
+            
             const $material = $button.closest('.gma-material');
             const materialId = $material.data('material-id');
             const acao = $button.hasClass('gma-aprovar') ? 'aprovar' : 'reprovar';
-            
-            // Desabilita o botão
-            $button.prop('disabled', true);
             
             $.ajax({
                 url: gmaAjax.ajaxurl,
@@ -121,9 +123,10 @@
                     });
                 },
                 complete: function() {
-                    // Remove a trava e reabilita o botão
-                    isProcessing = false;
-                    $button.prop('disabled', false);
+                    setTimeout(() => {
+                        isProcessing = false;
+                        $button.prop('disabled', false);
+                    }, 500); // Delay para garantir que não haja duplo processamento
                 }
             });
         }
@@ -131,9 +134,16 @@
         // Aplicar debounce na função de clique
         const debouncedHandler = debounce(handleButtonClick, 250);
 
-        // Event listeners usando apenas 'click'
-        $(document).on('click', '.gma-aprovar, .gma-reprovar', debouncedHandler);
+        // Event listeners com tratamento específico para mobile
+        $(document).on('click touchstart.once', '.gma-aprovar, .gma-reprovar', function(e) {
+            if (e.type === 'touchstart') {
+                e.preventDefault();
+                $(this).off('click');
+            }
+            debouncedHandler.call(this, e);
+        });
 
+        // Resto do código permanece igual...
         $(document).on('click', '.gma-editar', function(event) {
             event.preventDefault();
             const $material = $(this).closest('.gma-material');
@@ -210,8 +220,10 @@
                     });
                 },
                 complete: function() {
-                    isProcessing = false;
-                    $button.prop('disabled', false);
+                    setTimeout(() => {
+                        isProcessing = false;
+                        $button.prop('disabled', false);
+                    }, 500);
                 }
             });
         });
