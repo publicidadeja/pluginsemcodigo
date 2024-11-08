@@ -1,7 +1,7 @@
 <?php
 // Funções relacionadas a materiais
 
-function gma_criar_material($campanha_id, $imagem_url, $copy, $link_canva, $arquivo_id = null) {
+function gma_criar_material($campanha_id, $imagem_url, $copy, $link_canva = '', $arquivo_id = null, $tipo_midia = 'imagem', $video_url = '') {
     global $wpdb;
     $tabela = $wpdb->prefix . 'gma_materiais';
 
@@ -15,21 +15,34 @@ function gma_criar_material($campanha_id, $imagem_url, $copy, $link_canva, $arqu
             return false; // Material já existe
         }
 
-        $wpdb->insert(
-            $tabela,
-            array(
-                'campanha_id' => $campanha_id,
-                'imagem_url' => $imagem_url,
-                'copy' => $copy,
-                'link_canva' => $link_canva,
-                'arquivo_id' => $arquivo_id,
-                'status_aprovacao' => 'pendente',
-            )
+        $dados = array(
+            'campanha_id' => $campanha_id,
+            'imagem_url' => $imagem_url,
+            'copy' => $copy,
+            'link_canva' => $link_canva,
+            'arquivo_id' => $arquivo_id,
+            'status_aprovacao' => 'pendente',
+            'tipo_midia' => $tipo_midia,
+            'video_url' => $video_url,
+            'data_criacao' => current_time('mysql')
         );
 
+        $formatos = array(
+            '%d', // campanha_id
+            '%s', // imagem_url
+            '%s', // copy
+            '%s', // link_canva
+            '%d', // arquivo_id
+            '%s', // status_aprovacao
+            '%s', // tipo_midia
+            '%s', // video_url
+            '%s'  // data_criacao
+        );
+
+        $resultado = $wpdb->insert($tabela, $dados, $formatos);
         $insert_id = $wpdb->insert_id;
 
-        if ($insert_id) {
+        if ($resultado && $insert_id) {
             $wpdb->query('COMMIT');
             return $insert_id;
         } else {
@@ -522,6 +535,87 @@ function gma_notificar_admin_mudanca_status($material_id, $novo_status) {
         </div>";
 
     gma_exibir_notificacao_admin($mensagem_notificacao, $status_class);
+}
+
+// Funções para gerenciamento de mídia em massa
+function gma_processar_upload_em_massa($arquivos, $campanha_id) {
+    $resultados = array(
+        'sucesso' => array(),
+        'erros' => array()
+    );
+    
+    foreach ($arquivos['name'] as $key => $nome) {
+        $arquivo_temp = $arquivos['tmp_name'][$key];
+        $tipo = $arquivos['type'][$key];
+        
+        // Verifica se é um tipo de mídia permitido
+        if (strpos($tipo, 'image/') === 0 || strpos($tipo, 'video/') === 0) {
+            $upload = wp_upload_bits($nome, null, file_get_contents($arquivo_temp));
+            
+            if (!$upload['error']) {
+                // Criar material com o arquivo
+                $material_id = gma_criar_material(
+                    $campanha_id,
+                    $upload['url'],
+                    '', // copy vazio inicialmente
+                    '', // link_canva vazio
+                    null
+                );
+                
+                if ($material_id) {
+                    $resultados['sucesso'][] = $nome;
+                } else {
+                    $resultados['erros'][] = "Erro ao criar material para: $nome";
+                }
+            } else {
+                $resultados['erros'][] = "Erro no upload: $nome";
+            }
+        } else {
+            $resultados['erros'][] = "Tipo de arquivo não permitido: $nome";
+        }
+    }
+    
+    return $resultados;
+}
+
+// Função para gerenciar tags
+function gma_adicionar_tag($material_id, $tag_nome) {
+    global $wpdb;
+    $tabela_tags = $wpdb->prefix . 'gma_tags';
+    $tabela_material_tags = $wpdb->prefix . 'gma_material_tags';
+    
+    // Verifica se a tag já existe
+    $tag = $wpdb->get_row($wpdb->prepare(
+        "SELECT id FROM $tabela_tags WHERE nome = %s",
+        $tag_nome
+    ));
+    
+    // Se não existe, cria
+    if (!$tag) {
+        $wpdb->insert($tabela_tags, array('nome' => $tag_nome));
+        $tag_id = $wpdb->insert_id;
+    } else {
+        $tag_id = $tag->id;
+    }
+    
+    // Associa a tag ao material
+    return $wpdb->insert($tabela_material_tags, array(
+        'material_id' => $material_id,
+        'tag_id' => $tag_id
+    ));
+}
+
+// Função para gerenciar versões
+function gma_criar_versao_material($material_id, $nova_url, $descricao) {
+    global $wpdb;
+    $tabela_versoes = $wpdb->prefix . 'gma_versoes';
+    
+    return $wpdb->insert($tabela_versoes, array(
+        'material_id' => $material_id,
+        'url' => $nova_url,
+        'descricao' => $descricao,
+        'data_criacao' => current_time('mysql')
+    ));
 }
 
 // Função para exibir a notificação no painel do admin
