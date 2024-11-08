@@ -5,32 +5,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-function gma_verificar_acesso_admin() {
-    if (!current_user_can('manage_options')) {
-        wp_die(__('Você não tem permissão para acessar esta página.'));
-    }
-
-    $licenca_ativa = get_option('gma_licenca_ativa');
-    if (!$licenca_ativa || !gma_verificar_licenca($licenca_ativa)) {
-        wp_redirect(add_query_arg(
-            array(
-                'page' => 'gma-ativacao',
-                'error' => 'licenca_invalida'
-            ),
-            admin_url('admin.php')
-        ));
-        exit;
-    }
-}
-
 add_action('admin_menu', 'gma_criar_menu_admin');
-function gma_exibir_pagina_ativacao() {
-    if (!current_user_can('manage_options')) {
-        wp_die(__('Você não tem permissão para acessar esta página.'));
-    }
-    
-    include GMA_PLUGIN_DIR . 'templates/pagina-ativacao.php';
-}
 
 function gma_criar_menu_admin() {
     // Adicionando a página principal do plugin
@@ -52,6 +27,7 @@ function gma_criar_menu_admin() {
         array('Novo Material', 'gma-novo-material', 'gma_pagina_novo_material'),
         array('Editar Material', 'gma-editar-material', 'gma_pagina_editar_material'),
         array('Categorias', 'gma-criar-categoria', 'gma_pagina_criar_categoria'),
+        array('Calendário', 'gma-calendario', 'gma_pagina_calendario'), // Nova entrada para o calendário
         array('Relatório', 'gma-relatorio-campanhas', 'gma_pagina_relatorio_campanhas'),
     );
 
@@ -69,8 +45,6 @@ function gma_criar_menu_admin() {
 
 // Funções para exibir as páginas
 function gma_pagina_principal() {
-  gma_verificar_acesso_admin(); // Adicione esta linha
-    $notificacao = get_transient('gma_notificacao_admin');
   // Verificar se existe uma notificação
     $notificacao = get_transient('gma_notificacao_admin');
 
@@ -85,7 +59,6 @@ function gma_pagina_principal() {
 }
 
 function gma_pagina_campanhas() {
-  gma_verificar_acesso_admin();
     global $wpdb;
     if (isset($_POST['criar_campanha'])) {
         $nome = sanitize_text_field($_POST['nome_campanha']);
@@ -105,7 +78,6 @@ function gma_pagina_campanhas() {
 }
 
 function gma_pagina_nova_campanha() {
-  gma_verificar_acesso_admin();
     // Implementar lógica para criar nova campanha
     include GMA_PLUGIN_DIR . 'templates/pagina-nova-campanha.php';
 }
@@ -126,7 +98,6 @@ function gma_pagina_editar_campanha() {
 }
 
 function gma_pagina_listar_materiais() {
-  gma_verificar_acesso_admin();
   // Verificar se existe uma notificação
     $notificacao = get_transient('gma_notificacao_admin');
 
@@ -154,7 +125,6 @@ function gma_pagina_listar_materiais() {
 }
 
 function gma_pagina_novo_material() {
-  gma_verificar_acesso_admin();
     if (!session_id()) {
         session_start();
     }
@@ -195,7 +165,6 @@ function gma_pagina_novo_material() {
 }
 
 function gma_pagina_editar_material() {
-  gma_verificar_acesso_admin();
     if (!isset($_GET['id']) || !isset($_GET['tipo'])) {
         wp_die('Parâmetros inválidos.');
     }
@@ -255,7 +224,6 @@ function gma_pagina_editar_material() {
 }
 
 function gma_pagina_listar_categorias() {
-  gma_verificar_acesso_admin();
     if (!current_user_can('manage_options')) {
         wp_die(__('Você não tem permissão para acessar esta página.'));
     }
@@ -287,17 +255,14 @@ function gma_pagina_listar_categorias() {
 }
 
 function gma_pagina_criar_categoria() {
-  gma_verificar_acesso_admin();
     include GMA_PLUGIN_DIR . 'templates/pagina-criar-categoria.php';
 }
 
 function gma_pagina_relatorio_campanhas() {
-  gma_verificar_acesso_admin();
     include GMA_PLUGIN_DIR . 'templates/pagina-relatorio-campanhas.php';
 }
 
 function gma_atualizar_categoria($id, $novo_nome) {
-  gma_verificar_acesso_admin();
     global $wpdb;
     $table_name = $wpdb->prefix . 'gma_categorias';
     
@@ -318,7 +283,6 @@ function gma_atualizar_categoria($id, $novo_nome) {
 }
 
 function gma_excluir_categoria($id) {
-  gma_verificar_acesso_admin();
     global $wpdb;
     $table_name = $wpdb->prefix . 'gma_categorias';
     
@@ -334,4 +298,64 @@ function gma_excluir_categoria($id) {
     }
 
     return true;
+}
+
+function gma_pagina_calendario() {
+    ?>
+    <div class="wrap">
+        <h1>Calendário de Campanhas</h1>
+        <div id="calendario">
+            <?php
+            // Obter campanhas do banco de dados
+            $campanhas = gma_listar_campanhas();
+            
+            // Criar array de eventos para o calendário
+            $eventos = array();
+            foreach ($campanhas as $campanha) {
+                $eventos[] = array(
+                    'title' => esc_html($campanha->nome),
+                    'start' => $campanha->data_criacao,
+                    'url' => admin_url('admin.php?page=gma-editar-campanha&campanha_id=' . $campanha->id)
+                );
+            }
+            ?>
+            <div id='calendar'></div>
+        </div>
+    </div>
+
+    <!-- Incluir FullCalendar -->
+    <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/core@4.4.0/main.min.css' rel='stylesheet' />
+    <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@4.4.0/main.min.css' rel='stylesheet' />
+    <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/core@4.4.0/main.min.js'></script>
+    <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@4.4.0/main.min.js'></script>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            plugins: ['dayGrid'],
+            locale: 'pt-br',
+            events: <?php echo json_encode($eventos); ?>,
+            header: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,dayGridWeek'
+            }
+        });
+        calendar.render();
+    });
+    </script>
+
+    <style>
+    #calendar {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    .fc-event {
+        cursor: pointer;
+        padding: 5px;
+    }
+    </style>
+    <?php
 }
