@@ -39,14 +39,15 @@ require_once GMA_PLUGIN_DIR . 'includes/admin-editar-material.php';
 require_once GMA_PLUGIN_DIR . 'includes/taxonomies.php';
 
 
-register_activation_hook(__FILE__, 'gma_ativar_plugin');
 
+
+// Ativar plugin
+register_activation_hook(__FILE__, 'gma_ativar_plugin');
 
 function gma_ativar_plugin() {
     gma_criar_tabelas();
     gma_criar_tabela_estatisticas();
     create_logs_table();
-    gma_criar_tabela_licencas();
 
     global $wpdb;
     $tabela_campanhas = $wpdb->prefix . 'gma_campanhas';
@@ -58,13 +59,14 @@ function gma_ativar_plugin() {
     flush_rewrite_rules();
 }
 
+// Desativar plugin
 register_deactivation_hook(__FILE__, 'gma_desativar_plugin');
 
 function gma_desativar_plugin() {
     flush_rewrite_rules();
 }
 
-
+// Em gerenciador-marketing-avancado.php
 function gma_enqueue_admin_assets($hook) {
     $gma_pages = array(
         'toplevel_page_gma-plugin',
@@ -126,6 +128,8 @@ add_action('init', 'gma_rewrite_rules');
 
 // Enfileirar estilos e scripts para o frontend
 function gma_enqueue_frontend_assets() {
+   
+  
     wp_enqueue_style('gma-frontend-style', GMA_PLUGIN_URL . 'assets/css/frontend-style.css', array(), GMA_VERSION);
     wp_enqueue_style('gma-public-style', GMA_PLUGIN_URL . 'assets/css/public.css', array(), GMA_VERSION);
     
@@ -144,8 +148,6 @@ function gma_enqueue_frontend_assets() {
     ));
 }
 add_action('wp_enqueue_scripts', 'gma_enqueue_frontend_assets');
-
-
 
 // Usar template personalizado para exibição de campanha
 function gma_custom_template($template) {
@@ -518,280 +520,51 @@ function gma_default_campaign_type_callback() {
     <?php
 }
 
+// functions.php
+function gma_enqueue_calendar_scripts() {
+    wp_enqueue_style('fullcalendar', 'https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css');
+    wp_enqueue_script('fullcalendar', 'https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js');
+    wp_enqueue_script('gma-calendar', plugins_url('assets/js/calendar.js', GMA_PLUGIN_FILE));
+    
+    wp_localize_script('gma-calendar', 'gmaCalendar', array(
+        'ajaxurl' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('gma_calendar_nonce'),
+        'eventos' => gma_obter_eventos_calendario()
+    ));
+}
+
+function gma_gerar_link_google_calendar($campanha) {
+    $params = array(
+        'action' => 'TEMPLATE',
+        'text' => urlencode($campanha->nome),
+        'details' => urlencode('Cliente: ' . $campanha->cliente),
+        'dates' => date('Ymd', strtotime($campanha->data_criacao))
+    );
+    
+    return 'https://calendar.google.com/calendar/render?' . http_build_query($params);
+}
+
+function gma_agendar_lembrete($campanha_id, $data_lembrete) {
+    wp_schedule_single_event(
+        strtotime($data_lembrete),
+        'gma_enviar_lembrete_campanha',
+        array($campanha_id)
+    );
+}
+
+function gma_enviar_lembrete_campanha($campanha_id) {
+    $campanha = gma_obter_campanha($campanha_id);
+    $admin_email = get_option('admin_email');
+    
+    wp_mail(
+        $admin_email,
+        'Lembrete: Campanha ' . $campanha->nome,
+        'Não esqueça da campanha: ' . $campanha->nome
+    );
+}
+
+add_action('gma_enviar_lembrete_campanha', 'gma_enviar_lembrete_campanha');
 
 // Fim do arquivo
-
-function gma_adicionar_pagina_licenca() {
-    add_submenu_page(
-        'gma-plugin',
-        'Ativação do Plugin',
-        'Ativação',
-        'manage_options',
-        'gma-ativacao',
-        'gma_exibir_pagina_ativacao'
-    );
-}
-add_action('admin_menu', 'gma_adicionar_pagina_licenca');
-
-
-
-function gma_verificar_licenca($codigo) {
-    global $wpdb;
-    $tabela_licencas = $wpdb->prefix . 'gma_licencas';
-    $site_atual = get_site_url();
-    
-    $licenca = $wpdb->get_row($wpdb->prepare(
-        "SELECT * FROM $tabela_licencas WHERE codigo_licenca = %s AND status = 'ativo'",
-        $codigo
-    ));
-
-    if (!$licenca) {
-        return false;
-    }
-
-    // Verifica se está no site correto
-    if ($licenca->site_url !== $site_atual) {
-        return false;
-    }
-
-    // Verifica se não expirou
-    if (strtotime($licenca->data_expiracao) < time()) {
-        $wpdb->update(
-            $tabela_licencas,
-            array('status' => 'expirado'),
-            array('codigo_licenca' => $codigo)
-        );
-        return false;
-    }
-
-    return true;
-}
-
-function gma_criar_licenca_teste() {
-    global $wpdb;
-    $tabela_licencas = $wpdb->prefix . 'gma_licencas';
-    
-    $codigo = 'TESTE-' . strtoupper(substr(md5(uniqid()), 0, 8));
-    
-    $wpdb->insert(
-        $tabela_licencas,
-        array(
-            'codigo_licenca' => $codigo,
-            'tipo_licenca' => 'teste',
-            'status' => 'inativo'
-        )
-    );
-    
-    return $codigo;
-}
-
-function gma_criar_licenca_pro() {
-    global $wpdb;
-    $tabela_licencas = $wpdb->prefix . 'gma_licencas';
-    
-    $codigo = 'PRO-' . strtoupper(substr(md5(uniqid()), 0, 12));
-    
-    $wpdb->insert(
-        $tabela_licencas,
-        array(
-            'codigo_licenca' => $codigo,
-            'tipo_licenca' => 'pro',
-            'status' => 'inativo'
-        )
-    );
-    
-    return $codigo;
-}
-
-function gma_ativar_licenca($codigo) {
-    global $wpdb;
-    $tabela_licencas = $wpdb->prefix . 'gma_licencas';
-    $site_atual = get_site_url();
-    
-    // Verifica se a licença existe
-    $licenca = $wpdb->get_row($wpdb->prepare(
-        "SELECT * FROM $tabela_licencas WHERE codigo_licenca = %s",
-        $codigo
-    ));
-
-    if (!$licenca) {
-        return false;
-    }
-
-    // Define a duração baseada no tipo de licença
-    $duracao = ($licenca->tipo_licenca === 'pro') ? '+1 year' : '+1 day';
-    
-    // Atualiza a licença
-    $wpdb->update(
-        $tabela_licencas,
-        array(
-            'site_url' => $site_atual,
-            'status' => 'ativo',
-            'data_ativacao' => current_time('mysql'),
-            'data_expiracao' => date('Y-m-d H:i:s', strtotime($duracao))
-        ),
-        array('codigo_licenca' => $codigo)
-    );
-
-    return true;
-}
-
-function gma_verificar_acesso() {
-    $licenca_ativa = get_option('gma_licenca_ativa');
-    if (!$licenca_ativa || !gma_verificar_licenca($licenca_ativa)) {
-        return false;
-    }
-    return true;
-}
-
-add_action('admin_post_gma_ativar_licenca', 'gma_processar_ativacao_licenca');
-
-function gma_processar_ativacao_licenca() {
-    if (!current_user_can('manage_options')) {
-        wp_die(__('Você não tem permissão para realizar esta ação.'));
-    }
-
-    check_admin_referer('gma_ativar_licenca', 'gma_licenca_nonce');
-
-    $codigo_licenca = isset($_POST['codigo_licenca']) ? sanitize_text_field($_POST['codigo_licenca']) : '';
-
-    if (empty($codigo_licenca)) {
-        wp_redirect(add_query_arg(
-            array(
-                'message' => 'Por favor, insira um código de licença válido.',
-                'type' => 'error'
-            ),
-            admin_url('admin.php?page=gma-ativacao')
-        ));
-        exit;
-    }
-
-    if (gma_ativar_licenca($codigo_licenca)) {
-        update_option('gma_licenca_ativa', $codigo_licenca);
-        wp_redirect(add_query_arg(
-            array(
-                'message' => 'Licença ativada com sucesso!',
-                'type' => 'success'
-            ),
-            admin_url('admin.php?page=gma-ativacao')
-        ));
-    } else {
-        wp_redirect(add_query_arg(
-            array(
-                'message' => 'Código de licença inválido.',
-                'type' => 'error'
-            ),
-            admin_url('admin.php?page=gma-ativacao')
-        ));
-    }
-    exit;
-}
-
-
-function gma_verificar_licenca_global() {
-    global $pagenow;
-    $pagina_atual = isset($_GET['page']) ? $_GET['page'] : '';
-    
-    // Lista de páginas que não precisam de verificação
-    $paginas_excluidas = array(
-        'gma-ativacao'
-    );
-    
-    // Verifica se está em uma página do plugin e não é uma página excluída
-    if (strpos($pagina_atual, 'gma-') === 0 && !in_array($pagina_atual, $paginas_excluidas)) {
-        gma_verificar_acesso_admin();
-    }
-}
-
-
-
-function gma_dias_restantes_licenca() {
-    $data_expiracao = get_option('gma_data_expiracao_licenca');
-    if (!$data_expiracao) return false;
-
-    $hoje = new DateTime();
-    $expiracao = new DateTime($data_expiracao);
-    $diferenca = $hoje->diff($expiracao);
-
-    return $diferenca->invert ? 0 : $diferenca->days;
-}
-
-function gma_generate_license_key() {
-    $prefix = 'GMA';
-    $random = substr(str_shuffle('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 0, 12);
-    return $prefix . '-' . chunk_split($random, 4, '-');
-}
-
-function gma_validate_license($license_key) {
-    global $wpdb;
-    
-    $license = $wpdb->get_row($wpdb->prepare(
-        "SELECT * FROM {$wpdb->prefix}gma_licenses 
-        WHERE license_key = %s AND status = 'active'",
-        $license_key
-    ));
-    
-    if (!$license) {
-        return false;
-    }
-    
-    // Check if license has expired
-    if (strtotime($license->expiration_date) < time()) {
-        $wpdb->update(
-            $wpdb->prefix . 'gma_licenses',
-            array('status' => 'expired'),
-            array('id' => $license->id)
-        );
-        return false;
-    }
-    
-    return true;
-}
-
-
-
-add_action('woocommerce_order_status_completed', 'gma_create_license_on_order_complete');
-
-function gma_create_license_on_order_complete($order_id) {
-    $order = wc_get_order($order_id);
-    $user_id = $order->get_user_id();
-    
-    // Generate license key
-    $license_key = gma_generate_license_key();
-    
-    // Set expiration date (1 year from now)
-    $expiration_date = date('Y-m-d H:i:s', strtotime('+1 year'));
-    
-    // Store license in database
-    global $wpdb;
-    $wpdb->insert(
-        $wpdb->prefix . 'gma_licenses',
-        array(
-            'user_id' => $user_id,
-            'license_key' => $license_key,
-            'expiration_date' => $expiration_date,
-            'status' => 'active'
-        )
-    );
-    
-    // Send email to customer with license key
-    $to = $order->get_billing_email();
-    $subject = 'Sua licença do BrandAI - Gerenciador de Marketing Avançado PRO';
-    $message = "Sua chave de licença é: " . $license_key;
-    wp_mail($to, $subject, $message);
-}
-
-// Adicione isto no seu arquivo de funções principais
-add_action('admin_init', function() {
-    // Verifica se há uma URL de redirecionamento salva após ativação bem-sucedida
-    if (isset($_GET['activation_success']) && $_GET['activation_success'] == 1) {
-        $redirect_url = get_option('gma_redirect_after_activation');
-        if ($redirect_url) {
-            delete_option('gma_redirect_after_activation');
-            wp_redirect($redirect_url);
-            exit;
-        }
-    }
-});
 
 
