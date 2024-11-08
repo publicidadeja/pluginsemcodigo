@@ -2,6 +2,11 @@
 if (!defined('ABSPATH')) {
     exit;
 }
+
+// Carregar Dashicons no admin
+add_action('admin_enqueue_scripts', function() {
+    wp_enqueue_style('dashicons');
+});
 ?>
 
 <div class="gma-wrap">
@@ -100,6 +105,7 @@ if (!defined('ABSPATH')) {
                                 <th>Data de Criação</th>
                                 <th>Tipo</th>
                                 <th>Ações</th>
+                                <th>Compartilhar</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -154,6 +160,21 @@ if (!defined('ABSPATH')) {
                                                class="gma-button icon-button delete" 
                                                title="Excluir">
                                                 🗑️
+                                            </a>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="gma-button-group">
+                                            <a href="https://wa.me/?text=<?php echo urlencode('Confira a campanha: ' . $link_campanha); ?>" 
+                                               class="gma-button icon-button share-whatsapp" 
+                                               target="_blank"
+                                               title="Compartilhar via WhatsApp">
+                                                <span class="dashicons dashicons-whatsapp"></span>
+                                            </a>
+                                            <a href="mailto:?subject=<?php echo urlencode('Campanha: ' . $campanha->nome); ?>&body=<?php echo urlencode('Olá! Confira a campanha: ' . $link_campanha . "\n\nCliente: " . $campanha->cliente); ?>" 
+                                               class="gma-button icon-button share-email" 
+                                               title="Compartilhar via Email">
+                                                <span class="dashicons dashicons-email"></span>
                                             </a>
                                         </div>
                                     </td>
@@ -361,6 +382,35 @@ if (!defined('ABSPATH')) {
         flex-wrap: wrap;
     }
 }
+
+.share-whatsapp {
+    background-color: #25D366;
+    color: white !important;
+    transition: all 0.3s ease;
+}
+
+.share-whatsapp:hover {
+    background-color: #128C7E;
+    transform: scale(1.1);
+}
+
+.share-email {
+    background-color: #EA4335;
+    color: white !important;
+    transition: all 0.3s ease;
+}
+
+.share-email:hover {
+    background-color: #C5221F;
+    transform: scale(1.1);
+}
+
+.gma-button.icon-button .dashicons {
+    width: 18px;
+    height: 18px;
+    font-size: 18px;
+    line-height: 18px;
+}
 </style>
 
 <script>
@@ -399,6 +449,24 @@ document.addEventListener('DOMContentLoaded', function() {
     tableRows.forEach(row => {
         row.addEventListener('mouseenter', function() {
             this.style.transition = 'background-color 0.3s ease';
+        });
+    });
+
+    // Adicionar tracking para botões de compartilhamento
+    const shareButtons = document.querySelectorAll('.share-whatsapp, .share-email');
+    shareButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            if (this.classList.contains('share-whatsapp')) {
+                gtag('event', 'share', {
+                    'method': 'whatsapp',
+                    'content_type': 'campaign'
+                });
+            } else if (this.classList.contains('share-email')) {
+                gtag('event', 'share', {
+                    'method': 'email',
+                    'content_type': 'campaign'
+                });
+            }
         });
     });
 });
