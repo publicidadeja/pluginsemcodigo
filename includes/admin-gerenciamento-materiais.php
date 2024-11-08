@@ -130,3 +130,19 @@ if (!function_exists('gma_obter_nome_campanha')) {
         return $campanha ? $campanha->nome : 'N/A';
     }
 }
+
+function gma_adicionar_submenu_upload_massa() {
+    add_submenu_page(
+        'gma-gerenciar-materiais',
+        'Upload em Massa',
+        'Upload em Massa',
+        'manage_options',
+        'gma-upload-massa',
+        'gma_exibir_pagina_upload_massa'
+    );
+}
+add_action('admin_menu', 'gma_adicionar_submenu_upload_massa');
+
+function gma_exibir_pagina_upload_massa() {
+    require_once plugin_dir_path(__FILE__) . '../templates/upload-massa.php';
+}
